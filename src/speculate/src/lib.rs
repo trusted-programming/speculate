@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tokio::task; // Ensure tokio's async runtime is used.
+use std::thread;
 
 #[derive(Debug)]
 pub struct SpecStats {
@@ -10,7 +10,7 @@ pub struct SpecStats {
 /**
  * Speculatively execute consumer using the guessed value.
  */
-pub async fn spec<A, B>(
+pub fn spec<A, B>(
     producer: impl Fn() -> A + Send + 'static,
     predictor: impl Fn() -> A + Send + 'static,
     consumer: impl Fn(A) -> B + Send + 'static,
@@ -19,14 +19,12 @@ where
     A: Eq + Send + Clone + 'static,
     B: Send + 'static,
 {
-    let producer_result = task::spawn(async move { producer() });
+    let producer_result = thread::spawn(producer);
     let prediction = predictor();
 
     // TODO: might spawn a task here as well
     let speculative_result = consumer(prediction.clone());
-    let real_value = producer_result
-        .await
-        .expect("Failed to await producer result");
+    let real_value = producer_result.join().unwrap();
 
     if real_value == prediction {
         speculative_result
@@ -41,7 +39,7 @@ where
  * the &fn() would close over the Arc, and then it would .clone it for each new
  * dyn Fn
  */
-pub async fn specfold<A: Eq + Clone + Send + 'static>(
+pub fn specfold<A: Eq + Clone + Send + 'static>(
     iters: usize,
     loop_body: Arc<dyn Fn(usize, A) -> A + Send + Sync>,
     predictor: Arc<dyn Fn(usize) -> A + Send + Sync>,
@@ -57,17 +55,17 @@ pub async fn specfold<A: Eq + Clone + Send + 'static>(
         let loop_body_clone = loop_body.clone();
         let predictor_clone = predictor.clone();
 
-        let fut = task::spawn(async move {
+        let thread = thread::spawn(move || {
             let prediction = predictor_clone(i);
             let res = loop_body_clone(i, prediction.clone());
             (prediction, res)
         });
-        results.push(fut);
+        results.push(thread);
     }
 
     let mut previous: Option<A> = None;
-    for (i, handle) in results.iter_mut().enumerate() {
-        if let Ok((prediction, result)) = handle.await {
+    for (i, handle) in results.into_iter().enumerate() {
+        if let Ok((prediction, result)) = handle.join() {
             if let Some(prev) = &previous {
                 if *prev != prediction {
                     stats.mispredictions[i] = true;
@@ -76,6 +74,5 @@ pub async fn specfold<A: Eq + Clone + Send + 'static>(
             previous = Some(result);
         }
     }
-
     stats
 }

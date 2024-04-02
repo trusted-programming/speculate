@@ -4,10 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.37", features = ["full"] }
-
-[dev-dependencies]
-tokio = { version = "1", features = ["macros", "test-util"] }
 
 [[bench]]
 name = "bench"
