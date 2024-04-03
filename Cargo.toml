@@ -7,3 +7,6 @@ edition = "2021"
 
 [[bench]]
 name = "bench"
+
+[profile.bench]
+opt-level = 0
