@@ -1,4 +1,4 @@
-use speculate::*;
+use speculate_lib::*;
 use std::{
     sync::mpsc,
     thread::{self, JoinHandle},

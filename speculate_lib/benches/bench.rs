@@ -2,7 +2,7 @@
 
 extern crate test;
 
-use speculate::*;
+use speculate_lib::*;
 use std::sync::{mpsc, Arc};
 use test::{black_box, Bencher};
 
