@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::thread;
 
 #[derive(Debug)]
@@ -10,19 +9,14 @@ pub struct SpecStats {
 /**
  * Speculatively execute consumer using the guessed value.
  */
-pub fn spec<A, B>(
+pub fn spec<A: Eq + Send + Clone + 'static, B: Send + 'static>(
     producer: impl Fn() -> A + Send + 'static,
     predictor: impl Fn() -> A + Send + 'static,
     consumer: impl Fn(A) -> B + Send + 'static,
-) -> B
-where
-    A: Eq + Send + Clone + 'static,
-    B: Send + 'static,
-{
+) -> B {
     let producer_result = thread::spawn(producer);
     let prediction = predictor();
 
-    // TODO: might spawn a task here as well
     let speculative_result = consumer(prediction.clone());
     let real_value = producer_result.join().unwrap();
 
@@ -41,8 +35,8 @@ where
  */
 pub fn specfold<A: Eq + Clone + Send + 'static>(
     iters: usize,
-    loop_body: Arc<dyn Fn(usize, A) -> A + Send + Sync>,
-    predictor: Arc<dyn Fn(usize) -> A + Send + Sync>,
+    loop_body: impl Fn(usize, A) -> A + Send + Clone + 'static,
+    predictor: impl Fn(usize) -> A + Send + Clone + 'static,
 ) -> SpecStats {
     let mut results = Vec::with_capacity(iters);
 
