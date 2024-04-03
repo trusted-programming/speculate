@@ -23,8 +23,8 @@ impl Eq for NumericValue {}
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct SourceLocation {
-    line: usize,   // First line is 1
-    column: usize, // First character of a line is at column 1
+    pub line: usize,   // First line is 1
+    pub column: usize, // First character of a line is at column 1
 }
 
 impl SourceLocation {
@@ -71,7 +71,6 @@ pub enum Token {
 pub type Node = (Token, SourceLocation);
 
 pub struct Tokenizer {
-    // Won't be able to be an owned pointer, since will be shared across tasks
     input: Arc<String>,
     length: usize,
     position: usize,
@@ -118,6 +117,7 @@ impl Tokenizer {
 
     #[inline]
     fn starts_with(&self, needle: &str) -> bool {
+        dbg!(needle);
         self.input[self.position..].starts_with(needle)
     }
 
@@ -568,12 +568,12 @@ fn consume_numeric(tokenizer: &mut Tokenizer) -> Token {
             }
         }
     }
-    // TODO: handle overflow
+
     let value = NumericValue {
         int_value: if is_integer {
             Some(
                 // Remove any + sign as int::from_str() does not parse them.
-                if representation.starts_with('+') {
+                if !representation.starts_with('+') {
                     i64::from_str(&representation)
                 } else {
                     i64::from_str(&representation[1..])

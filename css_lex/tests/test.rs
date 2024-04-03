@@ -1,30 +1,32 @@
-extern mod css_lex;
-extern mod extra;
+use css_lex::lexer::*;
+use css_lex::to_json::*;
+use serde::Serialize;
+use serde_json::Value;
+use std::fmt::Debug;
 
-use extra::json;
-use extra::json::ToJson;
-use css_lex::*;
-
-fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
-    let items = match json::from_str(json_data) {
-        Ok(json::List(items)) => items,
-        _ => fail!("Invalid JSON")
+fn run_json_tests<T, F>(json_data: &str, parse: F)
+where
+    T: Serialize + Debug,
+    F: Fn(String) -> T,
+{
+    let items = match serde_json::from_str::<Value>(json_data) {
+        Ok(Value::Array(items)) => items,
+        _ => panic!("Invalid JSON"),
     };
     assert!(items.len() % 2 == 0);
-    let mut input: Option<~str> = None;
-    for item in items.move_iter() {
+    let mut input: Option<String> = None;
+    for item in items.into_iter() {
         match (&input, item) {
-            (&None, json::String(string)) => input = Some(string),
+            (&None, Value::String(string)) => input = Some(string),
             (&Some(_), expected) => {
-                let css = input.take_unwrap();
-                let result = parse(css.to_owned()).to_json();
+                let css = input.take().expect("Expected input to be Some");
+                let result =
+                    serde_json::to_value(parse(css.clone())).expect("Serialization failed");
                 if !json_almost_equals(&result, &expected) {
-                    fail!(format!("got: {}\nexpected: {}",
-                                  result.to_str(),
-                                  expected.to_str()));
+                    panic!("got: {:?}\nexpected: {:?}", result, expected);
                 }
-            },
-            _ => fail!("Unexpected JSON")
+            }
+            _ => panic!("Unexpected JSON"),
         };
     }
 }
@@ -32,12 +34,23 @@ fn run_json_tests<T: ToJson>(json_data: &str, parse: &fn (input: ~str) -> T) {
 #[test]
 fn tokenize_simple() {
     let mut t = tokenize("a");
-    assert!(t.next() == Some((Ident(~"a"), SourceLocation{ line:1, column: 1})));
+    assert!(
+        t.next()
+            == Some((
+                Token::Ident("a".to_string()),
+                SourceLocation { line: 1, column: 1 }
+            ))
+    );
 }
 
 #[test]
 fn test_tokenize_json() {
-    do run_json_tests(include_str!("css-lexing-tests/tokens.json")) |input| {
-        list_to_json(&tokenize(input).to_owned_vec())
-    }
+    run_json_tests(include_str!("tokens.json"), |input| {
+        let tokenizer = tokenize(&input);
+        let mut token_list = vec![];
+        for token in tokenizer {
+            token_list.push(token);
+        }
+        list_to_json(&token_list)
+    });
 }
