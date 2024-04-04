@@ -10,28 +10,12 @@ pub struct NumericValue {
     pub int_value: Option<i64>,
 }
 
-impl PartialEq for NumericValue {
-    fn eq(&self, other: &Self) -> bool {
-        // Compare the `representation` and `int_value` fields for exact equality.
-        self.representation == other.representation &&
-        self.int_value == other.int_value &&
-        // Compare the `value` fields with a tolerance for floating-point precision issues.
-        (self.value - other.value).abs() < f64::EPSILON
-    }
-}
-impl Eq for NumericValue {}
-
 #[derive(Eq, PartialEq, Clone)]
 pub struct SourceLocation {
     pub line: usize,   // First line is 1
     pub column: usize, // First character of a line is at column 1
 }
 
-impl SourceLocation {
-    pub fn to_json(&self) -> Value {
-        json!([self.line, self.column])
-    }
-}
 #[derive(PartialEq, Eq, Clone)]
 pub enum Token {
     Ident(String),
@@ -71,11 +55,30 @@ pub enum Token {
 pub type Node = (Token, SourceLocation);
 
 pub struct Tokenizer {
+    // Won't be able to be an owned pointer, since will be shared across tasks
     input: Arc<String>,
     length: usize,
     position: usize,
     line: usize,
     last_line_start: usize,
+}
+
+impl PartialEq for NumericValue {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare the `representation` and `int_value` fields for exact equality.
+        self.representation == other.representation &&
+        self.int_value == other.int_value &&
+        // Compare the `value` fields with a tolerance for floating-point precision issues.
+        (self.value - other.value).abs() < f64::EPSILON
+    }
+}
+
+impl Eq for NumericValue {}
+
+impl SourceLocation {
+    pub fn to_json(&self) -> Value {
+        json!([self.line, self.column])
+    }
 }
 
 impl Tokenizer {
@@ -105,19 +108,25 @@ impl Tokenizer {
 
     #[inline]
     fn char_at(&self, offset: usize) -> char {
-        self.input.chars().nth(self.position + offset).unwrap()
+        let byte_index = self.position + offset;
+
+        self.input
+            .get(byte_index..)
+            .and_then(|s| s.chars().next())
+            .unwrap()
     }
 
     #[inline]
     fn consume_char(&mut self) -> char {
-        let (_, char) = self.input[self.position..].char_indices().next().unwrap();
-        self.position += char.len_utf8();
-        char
+        let mut chars = self.input[self.position..].chars();
+        let c = chars.next().unwrap();
+
+        self.position += c.len_utf8();
+        c
     }
 
     #[inline]
     fn starts_with(&self, needle: &str) -> bool {
-        dbg!(needle);
         self.input[self.position..].starts_with(needle)
     }
 
@@ -185,6 +194,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Node> {
         column: tokenizer.position - tokenizer.last_line_start + 1,
     };
     let c = tokenizer.current_char();
+
     let token = match c {
         '\t' | '\n' | ' ' => {
             while !tokenizer.is_eof() {
@@ -202,6 +212,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Node> {
         '\"' => consume_string(tokenizer, false),
         '#' => {
             tokenizer.position += 1;
+
             if is_ident_start(tokenizer) {
                 Token::IDHash(consume_name(tokenizer))
             } else if !tokenizer.is_eof()
@@ -386,7 +397,7 @@ fn next_token(tokenizer: &mut Tokenizer) -> Option<Node> {
         // Non-ASCII
         _ if c > '\x7F' => consume_ident_like(tokenizer),
 
-        _ => {
+        c => {
             tokenizer.position += 1;
             Token::Delim(c)
         }
@@ -474,9 +485,11 @@ fn is_ident_start(tokenizer: &mut Tokenizer) -> bool {
 // From http://dev.w3.org/csswg/css-syntax/#consume-an-ident-like-token
 fn consume_ident_like(tokenizer: &mut Tokenizer) -> Token {
     let value = consume_name(tokenizer);
+
     if !tokenizer.is_eof() && tokenizer.current_char() == '\x28' {
         // \x28 == (
         tokenizer.position += 1;
+
         if value.eq_ignore_ascii_case("url") {
             consume_url(tokenizer)
         } else {
@@ -509,14 +522,13 @@ fn consume_name(tokenizer: &mut Tokenizer) -> String {
             _ => {
                 if c > '\x7F' {
                     tokenizer.consume_char()
-                }
-                // Non-ASCII
-                else {
+                } else {
                     break;
                 }
             }
         })
     }
+
     value
 }
 
@@ -640,6 +652,7 @@ fn consume_url(tokenizer: &mut Tokenizer) -> Token {
                 '\x00'..='\x08' | '\x0B' | '\x0E'..='\x1F' | '\x7F'  // non-printable
                     | '\"' | '\'' | '\x28' => return consume_bad_url(tokenizer),
                 '\\' => {
+
                     if !tokenizer.is_eof() && tokenizer.current_char() == '\n' {
                         return consume_bad_url(tokenizer)
                     }
