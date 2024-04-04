@@ -56,11 +56,11 @@ pub type Node = (Token, SourceLocation);
 
 pub struct Tokenizer {
     // Won't be able to be an owned pointer, since will be shared across tasks
-    input: Arc<String>,
-    length: usize,
-    position: usize,
-    line: usize,
-    last_line_start: usize,
+    pub input: Arc<String>,
+    pub length: usize,
+    pub position: usize,
+    pub line: usize,
+    pub last_line_start: usize,
 }
 
 impl PartialEq for NumericValue {
