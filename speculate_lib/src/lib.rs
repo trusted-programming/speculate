@@ -5,6 +5,7 @@ pub struct SpecStats {
     pub iters: usize,
     pub mispredictions: Vec<bool>,
 }
+//    let threads = thread::available_parallelism().unwrap().get() as f64;
 
 /**
  * Speculatively execute consumer using the guessed value.
@@ -59,13 +60,13 @@ pub fn specfold<A: Eq + Clone + Send + 'static>(
 
     let mut previous: Option<A> = None;
     for (i, handle) in results.into_iter().enumerate() {
-        if let Ok((prediction, result)) = handle.join() {
-            if let Some(prev) = &previous {
-                if *prev != prediction {
-                    stats.mispredictions[i] = true;
-                }
+        let (prediction, _) = handle.join().unwrap();
+        if let Some(prev) = &previous {
+            if *prev != prediction {
+                stats.mispredictions[i] = true;
+                let res = loop_body(i, prev.clone());
+                previous = Some(res);
             }
-            previous = Some(result);
         }
     }
     stats
