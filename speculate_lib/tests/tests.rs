@@ -45,7 +45,7 @@ fn test_specfold_correct_prediction() {
     let tx_clone = tx.clone();
     // Spawn the result collector thread
 
-    let loop_body = move |idx: usize, val: isize| -> isize {
+    let loop_body = move |idx: usize, val: &isize| -> isize {
         let res = idx as isize + val;
         tx.send(Some((idx, res))).unwrap();
         res
@@ -66,7 +66,7 @@ fn test_specfold_incorrect_prediction() {
     let (res_tx, res_rx) = mpsc::channel::<Vec<isize>>();
     let tx_clone = tx.clone();
 
-    let loop_body = move |idx: usize, val: isize| -> isize {
+    let loop_body = move |idx: usize, val: &isize| -> isize {
         let res = idx as isize + val + 5;
         tx.send(Some((idx, res))).unwrap();
         res
@@ -86,7 +86,7 @@ fn test_specfold_no_tasks() {
     let (res_tx, res_rx) = mpsc::channel::<Vec<isize>>();
     let tx_clone = tx.clone();
 
-    let loop_body = move |idx: usize, val: isize| -> isize {
+    let loop_body = move |idx: usize, val: &isize| -> isize {
         let res = idx as isize + val + 5;
         tx.send(Some((idx, res))).unwrap();
         res

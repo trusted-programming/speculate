@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 css_lex = { path = "../css_lex" }
 speculate_lib = { path = "../speculate_lib" }
+
 [dev-dependencies]
 css_lex = { path = "../css_lex" }
 speculate_lib = { path = "../speculate_lib" }

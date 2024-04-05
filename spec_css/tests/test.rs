@@ -1,7 +1,7 @@
 use css_lex::{json_almost_equals, list_to_json};
 use serde::Serialize;
 use serde_json::Value;
-use spec_css::*;
+use spec_css::{next_token_start, spec_tokenize};
 use std::sync::Arc;
 
 fn run_json_tests<T: Serialize>(json_data: &str, parse: &dyn Fn(String) -> T) {

@@ -36,11 +36,10 @@ pub fn spec<A: Eq + Send + Clone + 'static, B: Send + 'static>(
  */
 pub fn specfold<A: Eq + Clone + Send + 'static>(
     iters: usize,
-    loop_body: impl Fn(usize, A) -> A + Send + Clone + 'static,
+    loop_body: impl Fn(usize, &A) -> A + Send + Clone + 'static,
     predictor: impl Fn(usize) -> A + Send + Clone + 'static,
 ) -> SpecStats {
     let mut results = Vec::with_capacity(iters);
-
     let mut stats = SpecStats {
         iters,
         mispredictions: vec![false; iters],
@@ -52,7 +51,7 @@ pub fn specfold<A: Eq + Clone + Send + 'static>(
 
         let thread = thread::spawn(move || {
             let prediction = predictor_clone(i);
-            let res = loop_body_clone(i, prediction.clone());
+            let res = loop_body_clone(i, &prediction);
             (prediction, res)
         });
         results.push(thread);
@@ -64,7 +63,7 @@ pub fn specfold<A: Eq + Clone + Send + 'static>(
         if let Some(prev) = &previous {
             if *prev != prediction {
                 stats.mispredictions[i] = true;
-                let res = loop_body(i, prev.clone());
+                let res = loop_body(i, prev);
                 previous = Some(res);
             }
         }

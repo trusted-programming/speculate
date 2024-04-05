@@ -26,7 +26,6 @@ fn spawn_result_collector<T: Send + Clone + 'static>(
             match message {
                 (idx, Some(val)) => results[idx] = val,
                 (idx, None) => results[idx].clear(),
-                // No need for a None case outside of the loop condition due to `while let`
             }
         }
         let flattened_results = results.into_iter().flatten().collect();
@@ -43,7 +42,7 @@ fn spawn_result_collector<T: Send + Clone + 'static>(
  * Assumes `input` has already been preprocessed.
  */
 pub fn next_token_start(input: Arc<String>, start: usize) -> usize {
-    let mut tokenizer = Tokenizer::new(input.clone());
+    let mut tokenizer = Tokenizer::new(input);
     tokenizer.position = if start < LOOKBACK {
         0
     } else {
@@ -57,9 +56,8 @@ pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) 
     let input = preprocess(&input); // Assuming preprocess() adapts to String -> String
     let css_len = input.len();
     let str_arc = Arc::new(input.clone());
-    let str_arc_2 = Arc::new(input);
 
-    let iter_size: usize = (css_len + num_iters - 1) / num_iters; // round up
+    let iter_size: usize = (css_len + num_iters - 1).div_ceil(num_iters); // round up
 
     let (tx, rx) = mpsc::channel();
     let (res_tx, res_rx) = mpsc::channel();
@@ -67,10 +65,10 @@ pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) 
     // LOOP_BODY
     let body_tx = tx.clone();
 
-    let loop_body = move |idx: usize, token_start: usize| {
+    let loop_body = move |idx: usize, token_start: &usize| {
         let upper = std::cmp::min((idx + 1) * iter_size, css_len);
         let mut tokenizer = Tokenizer::new(Arc::clone(&str_arc));
-        tokenizer.position = token_start;
+        tokenizer.position = *token_start;
         let mut results: Vec<Node> = Vec::with_capacity(10);
         body_tx.send(Some((idx, None))).unwrap();
         while tokenizer.position < upper {
@@ -82,11 +80,11 @@ pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) 
         body_tx.send(Some((idx, Some(results)))).unwrap();
         tokenizer.position
     };
+    let str_arc = Arc::new(input);
 
     // PREDICTOR
 
-    let predictor = move |idx| next_token_start(Arc::clone(&str_arc_2), idx * iter_size);
-
+    let predictor = move |idx| next_token_start(Arc::clone(&str_arc), idx * iter_size);
     spawn_result_collector(rx, res_tx, num_iters);
     let res = specfold(num_iters, loop_body, predictor);
     tx.send(None).unwrap();
