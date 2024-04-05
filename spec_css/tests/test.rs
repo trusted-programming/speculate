@@ -12,6 +12,7 @@ fn run_json_tests<T: Serialize>(json_data: &str, parse: &dyn Fn(String) -> T) {
 
             let mut input: Option<String> = None;
             for item in items {
+                dbg!(&input);
                 match (&input, &item) {
                     (None, Value::String(string)) => input = Some(string.clone()),
                     (Some(_), expected) => {

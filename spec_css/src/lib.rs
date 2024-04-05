@@ -1,6 +1,6 @@
 use css_lex::*;
 use speculate_lib::*;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::{cmp, vec};
 
@@ -56,26 +56,23 @@ pub fn next_token_start(input: Arc<String>, start: usize) -> usize {
 pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) {
     let input = preprocess(&input); // Assuming preprocess() adapts to String -> String
     let css_len = input.len();
-    let str_arc = Arc::new(input);
+    let str_arc = Arc::new(input.clone());
+    let str_arc_2 = Arc::new(input);
+
     let iter_size: usize = (css_len + num_iters - 1) / num_iters; // round up
 
     let (tx, rx) = mpsc::channel();
     let (res_tx, res_rx) = mpsc::channel();
 
     // LOOP_BODY
-    let (arc_tx, arc_rx) = mpsc::channel();
-    let arc_rx = Arc::new(Mutex::new(arc_rx));
-    arc_tx.send(str_arc.clone()).unwrap();
     let body_tx = tx.clone();
 
     let loop_body = move |idx: usize, token_start: usize| {
         let upper = std::cmp::min((idx + 1) * iter_size, css_len);
-        let string = arc_rx.lock().unwrap().recv().unwrap();
-        let mut tokenizer = Tokenizer::new(string); // Assuming Tokenizer::new() now takes a string reference
+        dbg!(&str_arc);
+        let mut tokenizer = Tokenizer::new(Arc::clone(&str_arc));
         tokenizer.position = token_start;
         let mut results: Vec<Node> = Vec::with_capacity(10);
-
-        // Example adaptation, assuming functionality of sending to the channel
         body_tx.send(Some((idx, None))).unwrap();
         while tokenizer.position < upper {
             match tokenizer.next() {
@@ -88,21 +85,10 @@ pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) 
     };
 
     // PREDICTOR
-    let (predictor_tx, predictor_rx) = mpsc::channel();
-    let predictor_rx = Arc::new(Mutex::new(predictor_rx));
-    let str_arc_clone = Arc::clone(&str_arc);
-    predictor_tx
-        .send(str_arc_clone)
-        .expect("Failed to send on channel");
+
     let predictor = move |idx| {
-        next_token_start(
-            predictor_rx
-                .lock()
-                .unwrap()
-                .recv()
-                .expect("Failed to receive from channel"),
-            idx * iter_size,
-        )
+        dbg!(&str_arc_2);
+        next_token_start(Arc::clone(&str_arc_2), idx * iter_size)
     };
 
     spawn_result_collector(rx, res_tx, num_iters);
