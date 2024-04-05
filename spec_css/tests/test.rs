@@ -12,7 +12,6 @@ fn run_json_tests<T: Serialize>(json_data: &str, parse: &dyn Fn(String) -> T) {
 
             let mut input: Option<String> = None;
             for item in items {
-                dbg!(&input);
                 match (&input, &item) {
                     (None, Value::String(string)) => input = Some(string.clone()),
                     (Some(_), expected) => {
@@ -44,13 +43,21 @@ fn test_next_token_start() {
 }
 
 #[test]
-fn test_spec_token_json() {
+fn test_spec_token_json_1_iter() {
     run_json_tests(include_str!("../../css_lex/tests/tokens.json"), &|input| {
         list_to_json(&spec_tokenize(input, 1).1)
     });
+}
+
+#[test]
+fn test_spec_token_json_2_iter() {
     run_json_tests(include_str!("../../css_lex/tests/tokens.json"), &|input| {
         list_to_json(&spec_tokenize(input, 2).1)
     });
+}
+
+#[test]
+fn test_spec_token_json_3_iter() {
     run_json_tests(include_str!("../../css_lex/tests/tokens.json"), &|input| {
         list_to_json(&spec_tokenize(input, 3).1)
     });

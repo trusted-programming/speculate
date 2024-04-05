@@ -69,7 +69,6 @@ pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) 
 
     let loop_body = move |idx: usize, token_start: usize| {
         let upper = std::cmp::min((idx + 1) * iter_size, css_len);
-        dbg!(&str_arc);
         let mut tokenizer = Tokenizer::new(Arc::clone(&str_arc));
         tokenizer.position = token_start;
         let mut results: Vec<Node> = Vec::with_capacity(10);
@@ -86,10 +85,7 @@ pub fn spec_tokenize(input: String, num_iters: usize) -> (SpecStats, Vec<Node>) 
 
     // PREDICTOR
 
-    let predictor = move |idx| {
-        dbg!(&str_arc_2);
-        next_token_start(Arc::clone(&str_arc_2), idx * iter_size)
-    };
+    let predictor = move |idx| next_token_start(Arc::clone(&str_arc_2), idx * iter_size);
 
     spawn_result_collector(rx, res_tx, num_iters);
     let res = specfold(num_iters, loop_body, predictor);
