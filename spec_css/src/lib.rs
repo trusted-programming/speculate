@@ -22,13 +22,22 @@ fn spawn_result_collector<T: Send + Clone + 'static>(
 ) {
     thread::spawn(move || {
         let mut results = vec![Vec::new(); size];
-        while let Some(message) = receiver.recv().unwrap() {
+        while let Ok(message) = receiver.recv() {
             match message {
-                (idx, Some(val)) => results[idx] = val,
-                (idx, None) => results[idx].clear(),
+                None => break, // Break on receiving a None, indicating no more messages.
+                Some((idx, Some(val))) => {
+                    // Append new values to the existing vector instead of replacing it
+                    results[idx].extend(val);
+                }
+                Some((idx, None)) => {
+                    // Clear the vector at index idx
+                    results[idx].clear();
+                }
             }
         }
+        // Flatten the results and collect them into a single vector
         let flattened_results = results.into_iter().flatten().collect();
+        // Send the final results
         sender.send(flattened_results).unwrap();
     });
 }
@@ -46,9 +55,11 @@ pub fn next_token_start(input: Arc<String>, start: usize) -> usize {
     tokenizer.position = if start < LOOKBACK {
         0
     } else {
-        cmp::min(start - LOOKBACK, tokenizer.length)
+        start - LOOKBACK
     };
+
     while tokenizer.position < start && tokenizer.next().is_some() {}
+
     tokenizer.position
 }
 
